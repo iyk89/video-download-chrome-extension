@@ -1,53 +1,55 @@
 import express from "express";
 import cors from "cors";
-import ytdl from "ytdl-core";
-import https from "https";
+import { spawn } from "child_process";
 
 const app = express();
 app.use(cors());
 
 app.get("/", (req, res) => {
-  res.send("✅ YouTube Downloader API is live!");
+  res.send("✅ Video Downloader API is live!");
 });
 
 app.get("/download", async (req, res) => {
+  const videoUrl = req.query.url;
+  if (!videoUrl) {
+    return res.status(400).send("Missing 'url' parameter");
+  }
+
+  console.log("🎬 Fetching:", videoUrl);
+
   try {
-    const videoUrl = req.query.url;
+    const ytdlp = spawn("yt-dlp", [
+      "-o", "-",
+      "-f", "mp4",
+      "--no-warnings",
+      "--quiet",
+      videoUrl
+    ]);
 
-    if (!videoUrl || !ytdl.validateURL(videoUrl)) {
-      return res.status(400).send("Invalid YouTube URL");
-    }
-
-    console.log("🎬 Fetching:", videoUrl);
-
-    const info = await ytdl.getInfo(videoUrl, {
-      requestOptions: { agent: new https.Agent({ keepAlive: true }) }
-    });
-
-    const title = info.videoDetails.title.replace(/[^\w\s]/gi, "_") || "video";
-
-    res.header("Content-Disposition", `attachment; filename="${title}.mp4"`);
     res.header("Content-Type", "video/mp4");
+    res.header("Content-Disposition", "attachment; filename=video.mp4");
 
-    const stream = ytdl(videoUrl, {
-      format: "mp4",
-      quality: "highest",
-      requestOptions: { agent: new https.Agent({ keepAlive: true }) }
+    ytdlp.stdout.pipe(res);
+
+    ytdlp.stderr.on("data", (data) => {
+      console.error("⚠️ yt-dlp error:", data.toString());
     });
 
-    stream.on("error", (err) => {
-      console.error("❌ Stream error:", err.message);
-      if (!res.headersSent) {
-        res.status(500).send("Stream error: " + err.message);
+    ytdlp.on("close", (code) => {
+      if (code !== 0) {
+        console.error(`❌ yt-dlp exited with code ${code}`);
+        if (!res.headersSent) {
+          res.status(500).send("Download failed");
+        }
       } else {
-        res.destroy(err);
+        console.log("✅ Stream complete");
       }
     });
-
-    stream.pipe(res);
   } catch (err) {
-    console.error("❌ Download failed:", err.message);
-    res.status(500).send("Download failed: " + err.message);
+    console.error("❌ Server error:", err.message);
+    if (!res.headersSent) {
+      res.status(500).send("Server error: " + err.message);
+    }
   }
 });
 
