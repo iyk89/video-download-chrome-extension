@@ -11,45 +11,42 @@ app.get("/", (req, res) => {
 
 app.get("/download", async (req, res) => {
   const videoUrl = req.query.url;
-  if (!videoUrl) {
-    return res.status(400).send("Missing 'url' parameter");
-  }
+  if (!videoUrl) return res.status(400).send("Missing 'url' parameter");
 
-  console.log("🎬 Fetching:", videoUrl);
+  console.log("🎬 Requesting:", videoUrl);
 
   try {
-    const ytdlp = spawn("yt-dlp", [
+    const args = [
       "-o", "-",
-      "-f", "mp4",
+      "-f", "best[ext=mp4]/best",
       "--no-warnings",
       "--quiet",
+      "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+      "--referer", "https://www.youtube.com/",
       videoUrl
-    ]);
+    ];
+
+    const ytdlp = spawn("yt-dlp", args);
 
     res.header("Content-Type", "video/mp4");
     res.header("Content-Disposition", "attachment; filename=video.mp4");
 
     ytdlp.stdout.pipe(res);
 
-    ytdlp.stderr.on("data", (data) => {
-      console.error("⚠️ yt-dlp error:", data.toString());
-    });
+    let stderr = "";
+    ytdlp.stderr.on("data", d => (stderr += d.toString()));
 
-    ytdlp.on("close", (code) => {
+    ytdlp.on("close", code => {
       if (code !== 0) {
-        console.error(`❌ yt-dlp exited with code ${code}`);
-        if (!res.headersSent) {
-          res.status(500).send("Download failed");
-        }
+        console.error("❌ yt-dlp failed:", stderr || `exit code ${code}`);
+        if (!res.headersSent) res.status(500).send(`Download failed: ${stderr || code}`);
       } else {
         console.log("✅ Stream complete");
       }
     });
   } catch (err) {
-    console.error("❌ Server error:", err.message);
-    if (!res.headersSent) {
-      res.status(500).send("Server error: " + err.message);
-    }
+    console.error("❌ Server error:", err);
+    if (!res.headersSent) res.status(500).send("Server error: " + err.message);
   }
 });
 
