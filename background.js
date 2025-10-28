@@ -4,6 +4,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const apiUrl = `https://localhost:3000/download?url=${encodeURIComponent(videoUrl)}`;
 
     console.log("🎬 Sending download request to:", apiUrl);
+    console.log("🚀 Fetch starting...");
 
     fetch(apiUrl)
       .then(response => {
@@ -22,6 +23,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch(err => {
         console.error("❌ Download failed:", err.message);
         alert("Download failed: " + err.message);
+      })
+      .finally(() => {
+        console.log("🏁 Fetch finished.");
       });
   }
 });
