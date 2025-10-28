@@ -1,10 +1,16 @@
 {
-  "manifest_version": 3,
   "name": "YouTube Video Downloader",
   "version": "1.0",
-  "description": "Download YouTube videos using a local HTTPS server",
-  "permissions": ["activeTab", "downloads"],
-  "host_permissions": ["https://localhost:3000/*"],
+  "manifest_version": 3,
+  "description": "Download YouTube videos locally",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*.youtube.com/*",
+    "https://localhost:3000/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
