@@ -14,6 +14,7 @@ app.get("/", (req, res) => {
 
 app.get("/download", async (req, res) => {
   const videoUrl = req.query.url;
+  console.log("📥 Incoming /download request:", videoUrl, "from", req.headers.origin);
   if (!videoUrl) return res.status(400).send("Missing 'url' parameter");
   console.log("🎬 Requesting:", videoUrl);
 
