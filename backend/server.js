@@ -1,55 +1,67 @@
+// backend/server.js — Diagnostic build
 import express from "express";
+import ytdl from "ytdl-core";
 import cors from "cors";
-import https from "https";
 import fs from "fs";
-import path from "path";
-import { spawn } from "child_process";
+import https from "https";
 
 const app = express();
-app.use(cors());
 
+console.log("🧩 Server initializing...");
+
+app.use(cors({ origin: "*", methods: ["GET"] }));
+app.use(express.json());
+
+// --- Health check route ---
 app.get("/", (req, res) => {
-  res.send("✅ Local HTTPS server for Video Downloader is live!");
+  console.log("✅ Health check hit");
+  res.status(200).send("Server is alive.");
 });
 
+// --- Download route ---
 app.get("/download", async (req, res) => {
-  const videoUrl = req.query.url;
-  console.log("📥 Incoming /download request:", videoUrl, "from", req.headers.origin);
-  if (!videoUrl) return res.status(400).send("Missing 'url' parameter");
-  console.log("🎬 Requesting:", videoUrl);
+  const url = req.query.url;
+  console.log("🎬 /download route hit with:", url);
+
+  if (!url) {
+    console.error("❌ Missing URL parameter");
+    return res.status(400).send("Missing URL");
+  }
 
   try {
-    const ytdlp = spawn("yt-dlp", [
-      "-o", "-",
-      "-f", "best[ext=mp4]/best",
-      "--quiet",
-      videoUrl
-    ]);
+    if (!ytdl.validateURL(url)) {
+      console.warn("⚠️ Invalid YouTube URL:", url);
+      return res.status(400).send("Invalid YouTube URL");
+    }
 
-    res.header("Content-Type", "video/mp4");
-    res.header("Content-Disposition", "attachment; filename=video.mp4");
-    ytdlp.stdout.pipe(res);
+    console.log("🛰️ Valid URL confirmed, fetching info...");
+    const info = await ytdl.getInfo(url);
+    console.log("📘 Video title:", info.videoDetails.title);
 
-    ytdlp.on("close", (code) => {
-      if (code !== 0) {
-        console.error("❌ yt-dlp exited with code:", code);
-        if (!res.headersSent) res.status(500).send("Download failed");
-      }
-    });
+    const title = info.videoDetails.title.replace(/[^\w\s]/gi, "_");
+    res.header("Content-Disposition", `attachment; filename="${title}.mp4"`);
+    console.log("📡 Streaming video to client...");
+
+    ytdl(url, { quality: "highest" })
+      .on("error", (err) => {
+        console.error("🚨 Stream error:", err.message);
+        res.status(500).send("Stream error");
+      })
+      .pipe(res)
+      .on("close", () => console.log("✅ Stream completed successfully."));
   } catch (err) {
-    console.error("❌ Error:", err);
-    if (!res.headersSent) res.status(500).send("Server error");
+    console.error("🔥 Fatal error in /download:", err.message);
+    res.status(500).send("Download failed.");
   }
 });
 
-const certDir = path.resolve("./");
+// --- HTTPS server setup ---
+const PORT = 3000;
 const options = {
-  key: fs.readFileSync(path.join(certDir, "localhost-key.pem")),
-  cert: fs.readFileSync(path.join(certDir, "localhost.pem")),
+  key: fs.readFileSync("localhost-key.pem"),
+  cert: fs.readFileSync("localhost.pem"),
 };
 
-https.createServer(options, app).listen(3000, () => {
-  console.log("✅ HTTPS server running at:");
-  console.log("   https://localhost:3000");
-  console.log("   https://yt-downloader.local:3000");
+https.createServer(options, app).listen(PORT, () => {
+  console.log(`🟢 HTTPS server running on https://localhost:${PORT}`);
 });
