@@ -1,10 +1,37 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>YouTube Downloader</title>
-</head>
-<body>
-  <h3>Video Downloader</h3>
-  <p>Go to a YouTube video page and click “Download Video”.</p>
-</body>
+  <head>
+    <title>YouTube Downloader</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        width: 240px;
+        padding: 12px;
+      }
+      input {
+        width: 100%;
+        padding: 6px;
+        margin-bottom: 8px;
+      }
+      button {
+        width: 100%;
+        padding: 8px;
+        background-color: #e53935;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #d32f2f;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>🎬 YouTube Downloader</h3>
+    <input id="videoUrl" type="text" placeholder="Paste YouTube URL" />
+    <button id="downloadBtn">Download</button>
+
+    <script src="content.js"></script>
+  </body>
 </html>
