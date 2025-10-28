@@ -48,5 +48,7 @@ const options = {
 };
 
 https.createServer(options, app).listen(3000, () => {
-  console.log("✅ HTTPS server running at https://localhost:3000");
+  console.log("✅ HTTPS server running at:");
+  console.log("   https://localhost:3000");
+  console.log("   https://yt-downloader.local:3000");
 });
