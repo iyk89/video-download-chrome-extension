@@ -1,9 +1,12 @@
-// ---------- server.js ----------
+// ---------- secure_server.js ----------
 import express from "express";
 import ytdl from "ytdl-core";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import https from "https";
+import fs from "fs";
+import path from "path";
 
 const app = express();
 
@@ -13,19 +16,18 @@ app.use(express.json());
 
 const corsOptions = {
   origin: [
-    "chrome-extension://*",    // Chrome Extension
-    "http://localhost:3000",   // Local testing
-    "https://localhost:3000"
+    "chrome-extension://*",
+    "https://localhost:3000",
+    "https://yt-downloader.local:3000"
   ],
   methods: ["GET"],
   allowedHeaders: ["Content-Type"]
 };
 app.use(cors(corsOptions));
 
-// ===== Rate Limiter =====
 const limiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 30, // 30 requests per IP per window
+  max: 30,
   message: "Too many requests, please try again later."
 });
 app.use(limiter);
@@ -54,8 +56,15 @@ app.get("/download", async (req, res) => {
   }
 });
 
-// ===== Start Server =====
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
+// ===== HTTPS Server =====
+const certDir = path.resolve("./");
+const options = {
+  key: fs.readFileSync(path.join(certDir, "localhost-key.pem")),
+  cert: fs.readFileSync(path.join(certDir, "localhost.pem"))
+};
+
+https.createServer(options, app).listen(3000, () => {
+  console.log("✅ HTTPS server running at:");
+  console.log("   https://localhost:3000");
+  console.log("   https://yt-downloader.local:3000");
 });

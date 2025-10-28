@@ -1,98 +1,70 @@
+// ---------- secure_server.js ----------
+import express from "express";
+import ytdl from "ytdl-core";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import https from "https";
 import fs from "fs";
-import express from "express";
-import cors from "cors";
-import ytdl from "ytdl-core";
+import path from "path";
 
 const app = express();
 
-// ===== SECURITY CONFIG =====
-const CERT_PATH = "./localhost.pem";
-const KEY_PATH = "./localhost-key.pem";
-
-if (!fs.existsSync(CERT_PATH) || !fs.existsSync(KEY_PATH)) {
-  console.error("❌ SSL certificate missing. Run: mkcert localhost");
-  process.exit(1);
-}
+// ===== Security Middlewares =====
+app.use(helmet());
+app.use(express.json());
 
 const corsOptions = {
-  origin(origin, callback) {
-    if (!origin) return callback(null, true);
-    if (origin.startsWith("chrome-extension://")) {
-      return callback(null, true);
-    }
-    callback(new Error("Origin not allowed by CORS"));
-  },
+  origin: [
+    "chrome-extension://*",
+    "https://localhost:3000",
+    "https://yt-downloader.local:3000"
+  ],
   methods: ["GET"],
-  allowedHeaders: ["Content-Type"],
+  allowedHeaders: ["Content-Type"]
 };
-
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
 
-app.use((req, res, next) => {
-  const timestamp = new Date().toISOString();
-  const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-  console.log(`[${timestamp}] ${req.method} ${req.url} - ${ip}`);
-  next();
+const limiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 30,
+  message: "Too many requests, please try again later."
 });
+app.use(limiter);
 
-function sanitizeFilename(name = "video") {
-  return name
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .substring(0, 100) || "video";
-}
-
+// ===== Download Endpoint =====
 app.get("/download", async (req, res) => {
   try {
-    const videoUrl = req.query.url;
-
-    if (!videoUrl || typeof videoUrl !== "string") {
-      return res.status(400).json({ error: "Missing or invalid 'url' query parameter." });
+    const { url } = req.query;
+    if (!url || !ytdl.validateURL(url)) {
+      return res.status(400).send("Invalid YouTube URL");
     }
 
-    if (!ytdl.validateURL(videoUrl)) {
-      return res.status(400).json({ error: "Invalid YouTube URL." });
-    }
+    const info = await ytdl.getInfo(url);
+    const title = info.videoDetails.title.replace(/[^\w\s]/gi, "_");
 
-    const info = await ytdl.getInfo(videoUrl);
-    const title = sanitizeFilename(info.videoDetails?.title || "video");
-    const filename = `${title}.mp4`;
+    console.log(`[${new Date().toISOString()}] ▶ Download from ${req.ip}: ${title}`);
 
-    res.setHeader("Content-Type", "video/mp4");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");
-    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.header("Content-Disposition", `attachment; filename="${title}.mp4"`);
+    res.header("Cache-Control", "no-store");
+    res.header("Pragma", "no-cache");
 
-    const stream = ytdl(videoUrl, { quality: "highest" });
-
-    stream.on("error", (err) => {
-      console.error("❌ Stream error:", err.message);
-      if (!res.headersSent) {
-        res.status(500).json({ error: "Failed to stream video." });
-      } else {
-        res.destroy(err);
-      }
-    });
-
-    stream.pipe(res);
-  } catch (error) {
-    console.error("❌ Download handler error:", error.message);
-    res.status(500).json({ error: "Internal server error." });
+    ytdl(url, { quality: "highest" }).pipe(res);
+  } catch (err) {
+    console.error("❌ Error:", err.message);
+    res.status(500).send("Download failed");
   }
 });
 
-const httpsOptions = {
-  key: fs.readFileSync(KEY_PATH),
-  cert: fs.readFileSync(CERT_PATH),
+// ===== HTTPS Server =====
+const certDir = path.resolve("./");
+const options = {
+  key: fs.readFileSync(path.join(certDir, "localhost-key.pem")),
+  cert: fs.readFileSync(path.join(certDir, "localhost.pem"))
 };
 
-const PORT = 3000;
-
-https.createServer(httpsOptions, app).listen(PORT, () => {
-  console.log(`✅ Secure YouTube downloader listening on https://localhost:${PORT}`);
+https.createServer(options, app).listen(3000, () => {
+  console.log("✅ HTTPS server running at:");
+  console.log("   https://localhost:3000");
+  console.log("   https://yt-downloader.local:3000");
 });
