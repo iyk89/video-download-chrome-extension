@@ -1,20 +1,33 @@
+// setup-cert.js
 import { execSync } from "child_process";
 import fs from "fs";
 
-try {
-  if (!fs.existsSync("localhost.pem")) {
-    console.log("🔧 Generating HTTPS certificates for localhost...");
+function checkMkcert() {
+  try {
+    execSync("mkcert -help", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function generateCerts() {
+  if (!fs.existsSync("localhost.pem") || !fs.existsSync("localhost-key.pem")) {
+    console.log("🔧 Generating new HTTPS certificates for localhost...");
     execSync("mkcert -install", { stdio: "inherit" });
     execSync("mkcert localhost", { stdio: "inherit" });
     console.log("✅ Certificates created: localhost.pem & localhost-key.pem");
   } else {
     console.log("✅ Certificates already exist.");
   }
-} catch (err) {
-  console.error("❌ Failed to generate certificates.");
-  console.log("Please install mkcert manually:");
-  console.log("1. brew install mkcert");
-  console.log("2. mkcert -install");
-  console.log("3. mkcert localhost");
+}
+
+if (!checkMkcert()) {
+  console.log("❌ mkcert is not installed.");
+  console.log("To install it on macOS, run:");
+  console.log("  brew install mkcert nss");
+  console.log("Then rerun: npm run setup-cert");
   process.exit(1);
 }
+
+generateCerts();
