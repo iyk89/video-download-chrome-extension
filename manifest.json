@@ -2,33 +2,17 @@
   "manifest_version": 3,
   "name": "YouTube Video Downloader",
   "version": "1.0",
-  "description": "Download YouTube videos directly from the page.",
-  "permissions": ["downloads", "activeTab", "scripting"],
-  "host_permissions": [
-    "https://localhost:3000/*"
-  ],
+  "description": "Download YouTube videos using a local HTTPS server",
+  "permissions": ["activeTab", "downloads"],
+  "host_permissions": ["https://localhost:3000/*"],
   "background": {
     "service_worker": "background.js"
   },
-  "content_scripts": [
-    {
-      "matches": [
-        "https://www.youtube.com/*",
-        "https://m.youtube.com/*",
-        "https://youtu.be/*"
-      ],
-      "js": ["content.js"]
-    }
-  ],
   "action": {
-    "default_title": "Download Video",
+    "default_popup": "popup.html",
     "default_icon": {
-      "48": "icons/icon48.png"
-    },
-    "default_popup": "popup.html"
-  },
-  "icons": {
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   }
 }
